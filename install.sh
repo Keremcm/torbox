@@ -69,19 +69,6 @@ if [[ "$EUID" -ne 0 ]]; then
     exit 1
 fi
 
-# [FIX-E] Script dosyasının sahibinin root olup olmadığını kontrol et
-# (root olmayan bir kullanıcı tarafından manipüle edilmiş olabilir)
-script_owner="$(stat -c '%U' "${BASH_SOURCE[0]}")"
-if [[ "$script_owner" != "root" ]]; then
-    echo "UYARI: install.sh dosyasının sahibi root değil ($script_owner)."
-    echo "Devam etmek istiyor musunuz? (evet/hayır)"
-    read -r answer
-    if [[ "${answer,,}" != "evet" ]]; then
-        echo "Kurulum iptal edildi."
-        exit 1
-    fi
-fi
-
 # Yardım
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<EOF
