@@ -52,7 +52,7 @@
 1. Download or clone the repository:
 
 ```bash
-git clone <repo-url> torbox
+git clone https://github.com/Keremcm/torbox
 cd torbox
 ```
 
