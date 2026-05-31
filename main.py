@@ -198,10 +198,9 @@ class TorTrafficRedirector:
         rules += [['-d', net, '-j', 'RETURN'] for net in self.excluded_networks]
 
         # [FIX-2] DNS leak: TCP ve UDP 53 → DNSPort
-        # [FIX-8] DNAT kullanıyoruz, bazı kernel'larda REDIRECT 5353'e yönlendiremeyebiliyor
         rules += [
-            ['-p', 'tcp', '--dport', '53', '-j', 'DNAT', '--to-destination', f'127.0.0.1:{self.dns_port}'],
-            ['-p', 'udp', '--dport', '53', '-j', 'DNAT', '--to-destination', f'127.0.0.1:{self.dns_port}'],
+            ['-p', 'tcp', '--dport', '53', '-j', 'REDIRECT', '--to-ports', str(self.dns_port)],
+            ['-p', 'udp', '--dport', '53', '-j', 'REDIRECT', '--to-ports', str(self.dns_port)],
             ['-p', 'tcp', '-j', 'REDIRECT', '--to-ports', str(self.trans_port)],
         ]
 
@@ -228,15 +227,20 @@ class TorTrafficRedirector:
     # [FIX-1] IPv6 leak koruması
     # ------------------------------------------------------------------ #
 
-    def setup_ip6tables(self):
+    def setup_ip6tables(self, strict=False):
         """
-        IPv6 trafiğini tamamen engeller. Tor transparent proxy IPv6'yı
-        desteklemiyor; eğer izin verilirse tüm IPv6 trafiği Tor dışından
-        giderek kimliği ifşa eder.
+        IPv6 trafiğini yönetir.
+        strict=True → tüm IPv6 DROP (leak koruması, ama IPv6-only siteler çalışmaz)
+        strict=False → sadece uyarı verir, trafiği engellemez
         """
         if not self.check_command('ip6tables'):
             logger.warning('ip6tables bulunamadı; IPv6 leak koruması devre dışı!')
             return False
+
+        if not strict:
+            logger.warning('⚠ IPv6 leak koruması pasif — IPv6 trafiği Tor dışından gidebilir')
+            logger.warning('  Tam koruma için: torbox start --strict-ipv6')
+            return True
 
         tor_uid = self.get_tor_uid()
         if tor_uid is None:
@@ -251,11 +255,13 @@ class TorTrafficRedirector:
             self._run(['ip6tables', '-t', 'filter', '-A', 'OUTPUT', '-j', self.TOR_CHAIN_V6], check=True)
 
         rules_v6 = [
-            # [FIX-10] Tor kendi trafiğini gönderebilmeli
+            # Tor kendi trafiğini gönderebilmeli
             ['-m', 'owner', '--uid-owner', tor_uid, '-j', 'RETURN'],
             # Loopback serbest
             ['-o', 'lo', '-j', 'RETURN'],
-            # Geri kalan tüm IPv6 trafiğini düşür
+            # Geri kalan IPv6 trafiğini düşür (leak koruması)
+            # NOT: Bu kural IPv6-only sitelere erişimi engeller.
+            # IPv6 leak riski taşıyan ortamlarda aktif bırakın.
             ['-j', 'DROP'],
         ]
 
@@ -484,7 +490,7 @@ class TorTrafficRedirector:
     # Start / Stop
     # ------------------------------------------------------------------ #
 
-    def start(self):
+    def start(self, strict_ipv6=False):
         self.check_root()
 
         logger.info('TorBox başlatılıyor...')
@@ -496,7 +502,6 @@ class TorTrafficRedirector:
         if not self.check_tor_running():
             logger.info('Tor servisi başlatılıyor...')
             self._run(['systemctl', 'start', 'tor'], check=True)
-            # [FIX-5] Aktif polling ile bekle
             if not self._wait_for_tor():
                 logger.error('Tor başlatılamadı!')
                 return False
@@ -505,9 +510,8 @@ class TorTrafficRedirector:
             logger.error('iptables (IPv4) kuralları uygulanamadı!')
             return False
 
-        # [FIX-1] IPv6 koruma kuralları
-        if not self.setup_ip6tables():
-            logger.warning('⚠ IPv6 leak koruması uygulanamadı — dikkatli olun!')
+        # IPv6: strict modda DROP, normal modda sadece uyarı
+        self.setup_ip6tables(strict=strict_ipv6)
 
         time.sleep(1)
         self.test_connection()
@@ -532,10 +536,11 @@ class TorTrafficRedirector:
 
 def print_usage():
     print('Kullanım:')
-    print('  sudo torbox start   - Tüm trafiği Tor üzerinden yönlendir')
-    print('  sudo torbox stop    - Yönlendirmeyi durdur')
-    print('  sudo torbox status  - Durumu göster')
-    print('  sudo torbox test    - Bağlantıyı test et')
+    print('  sudo torbox start                 - Tüm trafiği Tor üzerinden yönlendir')
+    print('  sudo torbox start --strict-ipv6   - IPv6\'yı tamamen engelle (leak koruması)')
+    print('  sudo torbox stop                  - Yönlendirmeyi durdur')
+    print('  sudo torbox status                - Durumu göster')
+    print('  sudo torbox test                  - Bağlantıyı test et')
 
 
 def main():
@@ -547,7 +552,8 @@ def main():
     redirector = TorTrafficRedirector()
 
     if command == 'start':
-        redirector.start()
+        strict = '--strict-ipv6' in sys.argv
+        redirector.start(strict_ipv6=strict)
     elif command == 'stop':
         redirector.stop()
     elif command == 'status':
