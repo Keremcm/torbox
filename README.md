@@ -1,69 +1,68 @@
 # TorBox
 
-`TorBox`, Linux sisteminizde tüm çıkış trafiğini Tor üzerinden yönlendirmek için tasarlanmış basit bir araçtır. Bu proje `main.py` ve `install.sh` içerir;
-`main.py` Tor yapılandırmasını ve `iptables` kurallarını yönetir, `install.sh` ise sisteminizde gerekli paketler varsa bunları yüklemeden kurarak `torbox` komutunu `/usr/local/bin/torbox` olarak oluşturur.
+`TorBox` is a simple tool designed to route all outgoing traffic through Tor on your Linux system. This project includes `main.py` and `install.sh`; `main.py` manages the Tor configuration and `iptables` rules, while `install.sh` installs only the missing packages (without reinstalling existing ones) and creates the `torbox` command at `/usr/local/bin/torbox`.
 
 ---
 
-## İçindekiler
+## Table of Contents
 
-- [Özellikler](#özellikler)
-- [Gereksinimler](#gereksinimler)
-- [Kurulum](#kurulum)
-- [Kullanım](#kullanım)
-- [Nasıl çalışır](#nasıl-çalışır)
-- [Yapılandırma](#yapılandırma)
-- [Test ve doğrulama](#test-ve-doğrulama)
-- [Durdurma](#durdurma)
-- [Sorun giderme](#sorun-giderme)
-- [Dağıtım uyumluluğu](#dağıtım-uyumluluğu)
-- [Notlar](#notlar)
-
----
-
-## Özellikler
-
-- Tüm sistem çıkış trafiğini Tor üzerinden yönlendirme
-- Tor yapılandırmasını `torrc.d/torbox.conf` dosyasına yazar
-- `iptables` içinde özel bir zincir (`TORBOX`) kullanır
-- Mevcut Tor sistem trafiğini halihazırda aşırı engellemeden korur
-- `install.sh` ile `torbox` komutunu sistem genelinde kurma
-- Paket yükleme sırasında mevcut paketleri yeniden yüklemeden sadece eksik olanları kurma
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [How It Works](#how-it-works)
+- [Configuration](#configuration)
+- [Testing and Verification](#testing-and-verification)
+- [Stopping](#stopping)
+- [Troubleshooting](#troubleshooting)
+- [Distribution Compatibility](#distribution-compatibility)
+- [Notes](#notes)
 
 ---
 
-## Gereksinimler
+## Features
+
+- Routes all system outgoing traffic through Tor
+- Writes Tor configuration to `torrc.d/torbox.conf`
+- Uses a dedicated chain (`TORBOX`) within `iptables`
+- Protects existing Tor system traffic without over-blocking
+- System-wide installation of the `torbox` command via `install.sh`
+- Installs only missing packages without reinstalling existing ones during setup
+
+---
+
+## Requirements
 
 - Linux
-- `bash` destekli terminal
+- Terminal with `bash` support
 - `python3`
-- `systemd` tabanlı servis yönetimi (`systemctl`)
+- `systemd`-based service management (`systemctl`)
 - `tor`
 - `curl`
 - `iptables`
-- `python3-requests` veya paket bağımlılığı olarak `requests`
-- Root yetkisi
+- `python3-requests` or `requests` as a package dependency
+- Root privileges
 
-> `install.sh` bu paketleri tespit eder ve yalnızca eksik paketleri yükler. Paket veritabanlarını güncellemez.
+> `install.sh` detects these packages and installs only the missing ones. It does not update package databases.
 
 ---
 
-## Kurulum
+## Installation
 
-1. Depoyu indirin veya kopyalayın:
+1. Download or clone the repository:
 
 ```bash
 git clone <repo-url> torbox
 cd torbox
 ```
 
-2. `install.sh` betiğini çalıştırın:
+2. Run the `install.sh` script:
 
 ```bash
 sudo bash ./install.sh
 ```
 
-3. Kurulumdan sonra komut şu şekilde kullanılabilir:
+3. After installation, the command can be used as follows:
 
 ```bash
 sudo torbox start
@@ -74,42 +73,42 @@ sudo torbox test
 
 ---
 
-## Kullanım
+## Usage
 
-### Başlatma
+### Starting
 
-TorBox'u başlatmak için:
+To start TorBox:
 
 ```bash
 sudo torbox start
 ```
 
-Bu komut:
+This command:
 
-- root yetkisini doğrular
-- Tor yapılandırmasını `TORRC_CUSTOM` dosyasına yazar
-- Tor servisini başlatır veya yeniden başlatır
-- `iptables` içinde `TORBOX` adlı özel bir zincir yaratır
-- TCP ve DNS isteklerini Tor'a yönlendirir
-- bağlantı testi çalıştırır
+- Verifies root privileges
+- Writes the Tor configuration to `TORRC_CUSTOM`
+- Starts or restarts the Tor service
+- Creates a dedicated chain named `TORBOX` within `iptables`
+- Redirects TCP and DNS requests to Tor
+- Runs a connectivity test
 
-### Durdurma
+### Stopping
 
-Tor trafiğini normale döndürmek için:
+To restore traffic to normal:
 
 ```bash
 sudo torbox stop
 ```
 
-Bu komut:
+This command:
 
-- `TORBOX` zinciri için `OUTPUT` yönlendirmesini kaldırır
-- `TORBOX` zincirini boşaltır ve siler
-- mevcut durumu gösterir
+- Removes the `OUTPUT` redirect for the `TORBOX` chain
+- Flushes and deletes the `TORBOX` chain
+- Displays the current status
 
-### Durum
+### Status
 
-TorBox kurallarının aktifliğini kontrol etmek için:
+To check whether TorBox rules are active:
 
 ```bash
 sudo torbox status
@@ -117,40 +116,40 @@ sudo torbox status
 
 ### Test
 
-Tor bağlantısını test etmek için:
+To test the Tor connection:
 
 ```bash
 sudo torbox test
 ```
 
-Bu komut hem `curl` tabanlı hem de Python `requests` tabanlı kontrol çalıştırır (eğer `requests` yüklenmişse).
+This command runs both a `curl`-based and a Python `requests`-based check (if `requests` is installed).
 
 ---
 
-## Nasıl çalışır
+## How It Works
 
-`main.py` aşağıdaki adımları takip eder:
+`main.py` follows these steps:
 
-1. `TorTrafficRedirector` sınıfını oluşturur
-2. `start` çağrıldığında:
-   - yedek root kontrolü yapar
-   - Tor yapılandırmasını günceller
-   - Tor hizmetini başlatır
-   - `iptables` içinde `TORBOX` zincirini oluşturur
-   - tüm TCP trafiğini ve DNS trafiğini Tor portlarına yönlendirir
-3. `stop` çağrıldığında:
-   - `OUTPUT` zincirinden `TORBOX` yönlendirmesini kaldırır
-   - `TORBOX` zincirini siler
-4. `status` ve `test` komutları sistemsel durum hakkında bilgi verir
+1. Creates a `TorTrafficRedirector` instance
+2. When `start` is called:
+   - Performs a fallback root check
+   - Updates the Tor configuration
+   - Starts the Tor service
+   - Creates the `TORBOX` chain within `iptables`
+   - Redirects all TCP and DNS traffic to Tor ports
+3. When `stop` is called:
+   - Removes the `TORBOX` redirect from the `OUTPUT` chain
+   - Deletes the `TORBOX` chain
+4. The `status` and `test` commands provide information about the system state
 
 ---
 
-## Yapılandırma
+## Configuration
 
-Tor yapılandırması proje tarafından `/etc/tor/torrc.d/torbox.conf` dosyasına yazılır:
+The Tor configuration is written by the project to `/etc/tor/torrc.d/torbox.conf`:
 
 ```text
-# Transparent Proxy için gerekli ayarlar
+# Required settings for Transparent Proxy
 VirtualAddrNetworkIPv4 10.192.0.0/10
 AutomapHostsOnResolve 1
 TransPort 9040
@@ -160,64 +159,64 @@ ControlPort 9051
 CookieAuthentication 1
 ```
 
-Bu dosya Tor servisini yeniden başlatırken otomatik olarak yüklenir.
+This file is automatically loaded when the Tor service restarts.
 
 ---
 
-## Test ve doğrulama
+## Testing and Verification
 
-### Manuel doğrulama
+### Manual Verification
 
-TorBox çalıştıktan sonra aşağıdaki komutları kullanabilirsiniz:
+After TorBox is running, you can use the following commands:
 
 ```bash
 curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 curl -s https://check.torproject.org/api/ip
 ```
 
-İkinci komutta `Tor` IP adresi görmelisiniz. Eğer `requests` yüklüyse, `sudo torbox test` komutu da Tor üzerinden IP kontrolü yapar.
+The second command should show a Tor IP address. If `requests` is installed, `sudo torbox test` also performs an IP check over Tor.
 
 ---
 
-## Durdurma
+## Stopping
 
-TorBox trafiğini geri almanın güvenli yolu:
+The safe way to revert TorBox traffic:
 
 ```bash
 sudo torbox stop
 ```
 
-Bu komut, oluşturulan `TORBOX` zincirini sistem `iptables` tablosundan siler. Diğer `nat` kurallarına dokunmaz.
+This command deletes the created `TORBOX` chain from the system `iptables` table. It does not touch any other `nat` rules.
 
 ---
 
-## Sorun giderme
+## Troubleshooting
 
-### `torbox` komutu bulunamıyor
+### `torbox` command not found
 
-- `install.sh` doğru çalıştıysa `/usr/local/bin/torbox` oluşturulmuş olmalıdır.
-- Değilse, kurulum sonrası `ls -l /usr/local/bin/torbox` komutuyla dosyanın varlığını kontrol edin.
+- If `install.sh` ran correctly, `/usr/local/bin/torbox` should have been created.
+- If not, verify the file exists after installation with `ls -l /usr/local/bin/torbox`.
 
-### `iptables-nft` yerine `iptables` çakışması
+### `iptables` conflict with `iptables-nft`
 
-- `install.sh` mevcut paketleri yeniden kurmadan yalnızca eksik olanları yükler.
-- Yine de, `pacman` kullanıcıları `iptables`/`iptables-nft` çakışmaları alabilir. Bu durumda sistemde zaten çalışan `iptables` paketini tercih edin.
+- `install.sh` only installs missing packages without reinstalling existing ones.
+- However, `pacman` users may encounter `iptables`/`iptables-nft` conflicts. In this case, prefer the `iptables` package already running on your system.
 
-### `requests` yoksa Python testi atlanıyor
+### Python test is skipped if `requests` is missing
 
-- `main.py`, eğer `requests` yüklenmemişse `curl` tabanlı testle devam eder.
-- `requests` yüklemek için `sudo apt install python3-requests` veya dağıtımınıza uygun paketi kullanın.
+- `main.py` falls back to the `curl`-based test if `requests` is not installed.
+- To install `requests`, use `sudo apt install python3-requests` or the appropriate package for your distribution.
 
-### Tor servisi başlamazsa
+### Tor service fails to start
 
-- `sudo systemctl status tor` ile hizmet durumunu kontrol edin.
-- `sudo journalctl -u tor -n 50` ile hata kayıtlarını inceleyin.
+- Check the service status with `sudo systemctl status tor`.
+- Inspect error logs with `sudo journalctl -u tor -n 50`.
 
 ---
 
-## Desteklenen dağıtımlar
+## Distribution Compatibility
 
-`install.sh` aşağıdaki paket yöneticilerini algılar ve destekler:
+`install.sh` detects and supports the following package managers:
 
 - `apt` (Ubuntu, Debian)
 - `dnf` (Fedora, CentOS, AlmaLinux, Rocky Linux)
@@ -227,15 +226,9 @@ Bu komut, oluşturulan `TORBOX` zincirini sistem `iptables` tablosundan siler. D
 
 ---
 
-## Notlar
+## Notes
 
-- Bu proje `root` yetkisi gerektirir.
-- `install.sh` paket veritabanını güncellemez; yalnızca mevcut veritabanından eksik paketleri yükler.
-- TorBox, tüm TCP ve DNS trafiğinizi Tor ağından geçirir; bağlantı güvenliğini artırmak için sistem ve uygulama yapılandırmanızın Tor uyumlu olduğundan emin olun.
-- Bu araç özel bir `iptables` zinciri kullandığı için mevcut diğer `nat` yapılandırmalarınıza doğrudan müdahale etmez.
-
----
-
-## Lisans
-
-Bu proje için lisans bilgisi burada belirtilmemiştir. Kullanmak istediğiniz lisansı eklemek için `LICENSE` dosyası oluşturabilirsiniz.
+- This project requires `root` privileges.
+- `install.sh` does not update the package database; it only installs missing packages from the existing database.
+- TorBox routes all your TCP and DNS traffic through the Tor network; ensure your system and application configurations are Tor-compatible to enhance connection security.
+- Because this tool uses a dedicated `iptables` chain, it does not directly interfere with your other existing `nat` configurations.
